@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>호성T와 함께하는 점 찍기</title>
+  <style>
+    body { text-align: center; font-family: Arial, sans-serif; }
+    #gameCanvas { border: 2px solid black; transition: border 0.3s; }
+    #startButton {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 15px;
+      cursor: pointer;
+    }
+    .lucky {
+      color: gold;
+      font-weight: bold;
+      font-size: 20px;
+      text-shadow: 0 0 5px orange, 0 0 10px red;
+    }
+    .coords {
+      color: black;
+    }
+    @keyframes luckyBorder {
+      0% { border-color: gold; }
+      33% { border-color: orange; }
+      66% { border-color: red; }
+      100% { border-color: gold; }
+    }
+    .luckyCanvas {
+      animation: luckyBorder 1s infinite;
+      border-width: 4px !important;
+    }
+  </style>
+</head>
+<body>
+  <h1>호성T와 함께하는 점 찍기</h1>
+  <p>좌표평면 위에 제시된 점을 정확히 찍어 보세요!</p>
+  <button id="startButton">게임 시작</button>
+  <p id="question"></p>
+  <p>
+    남은 시간: <span id="timer">0</span> &nbsp;&nbsp;
+    <span id="progress">현재까지 푼 문제 수: 0</span>
+  </p>
+  <p>
+    점수: <span id="score">0</span> &nbsp;&nbsp;
+    <span id="remaining">남은 문제 수: 10</span>
+  </p>
+  <canvas id="gameCanvas" width="500" height="500"></canvas>
+  <p id="finalScore"></p>
+  <button id="restartButton" style="display:none;">다시 게임하기</button>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const startButton = document.getElementById("startButton");
+    const restartButton = document.getElementById("restartButton");
+    const questionEl = document.getElementById("question");
+    const timerEl = document.getElementById("timer");
+    const scoreEl = document.getElementById("score");
+    const finalScoreEl = document.getElementById("finalScore");
+    const progressEl = document.getElementById("progress");
+    const remainingEl = document.getElementById("remaining");
+
+    const size = 500;
+    const origin = size / 2;
+    const step = size / 14; // -7 ~ 7 범위니까 14칸
+
+    let problems = [];
+    let currentProblem = 0;
+    let score = 0;
+    let timer;
+    let timeLeft = 10;
+    let lucky = false;
+
+    function drawGrid() {
+      ctx.clearRect(0, 0, size, size);
+      ctx.lineWidth = 0.5;
+      ctx.strokeStyle = "#ccc";
+
+      for (let i = 0; i <= 14; i++) {
+        let pos = i * step;
+        ctx.beginPath();
+        ctx.moveTo(pos, 0);
+        ctx.lineTo(pos, size);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, pos);
+        ctx.lineTo(size, pos);
+        ctx.stroke();
+      }
+
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "black";
+      ctx.beginPath();
+      ctx.moveTo(0, origin);
+      ctx.lineTo(size, origin);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(origin, size);
+      ctx.lineTo(origin, 0);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(size, origin);
+      ctx.lineTo(size - 10, origin - 5);
+      ctx.lineTo(size - 10, origin + 5);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(origin, 0);
+      ctx.lineTo(origin - 5, 10);
+      ctx.lineTo(origin + 5, 10);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.font = "12px Arial";
+      ctx.fillStyle = "black";
+      for (let i = -6; i <= 6; i++) {
+        if (i === 0) continue;
+        ctx.fillText(i, origin + i * step - 5, origin + 15);
+        ctx.fillText(i, origin - 15, origin - i * step + 4);
+      }
+
+      ctx.font = "12px Times New Roman";
+      ctx.fillText("O", origin - 12, origin + 15);
+
+      ctx.font = "14px italic";
+      ctx.fillText("x", size - 15, origin + 15);
+      ctx.fillText("y", origin - 15, 15);
+    }
+
+    function getRandomInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function generateProblems() {
+      problems = [];
+      for (let i = 0; i < 10; i++) {
+        problems.push([getRandomInt(-6, 6), getRandomInt(-6, 6)]);
+      }
+    }
+
+    function updateProgress() {
+      progressEl.textContent = `현재까지 푼 문제 수: ${currentProblem}`;
+      remainingEl.textContent = `남은 문제 수: ${problems.length - currentProblem}`;
+    }
+
+    function startGame() {
+      startButton.style.display = "none";
+      restartButton.style.display = "none";
+      finalScoreEl.textContent = "";
+      score = 0;
+      scoreEl.textContent = score;
+      currentProblem = 0;
+      generateProblems();
+      updateProgress();
+      nextProblem();
+    }
+
+    function nextProblem() {
+      if (currentProblem >= problems.length) {
+        endGame();
+        return;
+      }
+      clearInterval(timer);
+      drawGrid();
+
+      let [x, y] = problems[currentProblem];
+      lucky = Math.random() < 0.15;
+
+      if (lucky) {
+        questionEl.innerHTML = `<span class="lucky">🌟 행운의 문제! 🌟 <span class="coords">(${x}, ${y})</span>를 찍으세요!</span>`;
+        canvas.classList.add("luckyCanvas");
+      } else {
+        questionEl.textContent = `(${x}, ${y})를 찍으세요`;
+        canvas.classList.remove("luckyCanvas");
+      }
+
+      timeLeft = 10;
+      timerEl.textContent = timeLeft;
+      timer = setInterval(() => {
+        timeLeft--;
+        timerEl.textContent = timeLeft;
+        if (timeLeft <= 0) {
+          clearInterval(timer);
+          showAnswer(x, y);
+          currentProblem++;
+          updateProgress();
+          setTimeout(nextProblem, 1000);
+        }
+      }, 1000);
+    }
+
+    function showAnswer(ansX, ansY) {
+      ctx.beginPath();
+      ctx.arc(origin + ansX * step, origin - ansY * step, 5, 0, 2 * Math.PI);
+      ctx.fillStyle = "blue";
+      ctx.fill();
+    }
+
+    canvas.addEventListener("click", (e) => {
+      if (currentProblem >= problems.length) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      const gridX = Math.round((x - origin) / step);
+      const gridY = Math.round((origin - y) / step);
+
+      let [ansX, ansY] = problems[currentProblem];
+
+      ctx.beginPath();
+      ctx.arc(origin + gridX * step, origin - gridY * step, 5, 0, 2 * Math.PI);
+      ctx.fillStyle = "red";
+      ctx.fill();
+
+      showAnswer(ansX, ansY);
+
+      if (gridX === ansX && gridY === ansY) {
+        score += lucky ? timeLeft * 2 : timeLeft;
+        scoreEl.textContent = score;
+      }
+
+      clearInterval(timer);
+      currentProblem++;
+      updateProgress();
+      setTimeout(nextProblem, 1000);
+    });
+
+    function endGame() {
+      questionEl.textContent = "";
+      finalScoreEl.textContent = `게임 종료! 최종 점수: ${score}`;
+      restartButton.style.display = "inline-block";
+      canvas.classList.remove("luckyCanvas");
+    }
+
+    startButton.addEventListener("click", startGame);
+    restartButton.addEventListener("click", startGame);
+
+    drawGrid();
+    updateProgress();
+  </script>
+</body>
+</html>
